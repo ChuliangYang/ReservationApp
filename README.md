@@ -29,7 +29,7 @@ Build the front end for a mobile web application that covers as many of the foll
 
 ## Architecture Diagram
 
-<img src="https://github.com/ChuliangYang/ReservationApp/blob/main/system-design.png" alt="Architecture Diagram" width="1200" height="1000"/>
+<img src="https://github.com/ChuliangYang/ReservationApp/blob/main/system-arch.svg" alt="Architecture Diagram" width="1200" height="1000"/>
 
 ## User Paths
 
