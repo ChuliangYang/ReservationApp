@@ -1,3 +1,5 @@
+package com.example.reservationapp.ui.feature.providerSchedule
+
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,11 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.reservationapp.core.ScheduleList
-import com.example.reservationapp.ui.feature.providerSchedule.ProviderEventState
-import com.example.reservationapp.ui.feature.providerSchedule.ProviderScheduleViewModel
-import com.example.reservationapp.ui.feature.providerSchedule.ProviderUIState
-import com.example.reservationapp.ui.feature.providerSchedule.TimeSlotUIItem
+import com.example.reservationapp.core.ui.TimeSlotUIItem
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import java.time.Instant
@@ -61,8 +59,9 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProviderScheduleScreen(
-    viewModel: ProviderScheduleViewModel = hiltViewModel(),
+fun ProviderSchedulingScreen(
+    viewModel: ProviderSchedulingViewModel = hiltViewModel(),
+    navigateToScheduleDetail: (providerId: Int) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val localContext = LocalContext.current
@@ -71,8 +70,12 @@ fun ProviderScheduleScreen(
         viewModel.events.onEach {
             it?.let {
                 when (it) {
-                    is ProviderEventState.Warning -> {
+                    is ProviderSchedulingEvent.Warning -> {
                         Toast.makeText(localContext, it.message, Toast.LENGTH_SHORT).show()
+                    }
+
+                    is ProviderSchedulingEvent.NavigateToScheduleDetail -> {
+                        navigateToScheduleDetail(it.providerId)
                     }
                 }
                 viewModel.onEventHandled()
@@ -84,19 +87,7 @@ fun ProviderScheduleScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    when (val uiState = uiState) {
-                        is ProviderUIState.Scheduling -> {
-                            Text("Add Your Schedule")
-                        }
-
-                        is ProviderUIState.Scheduled -> {
-                            Text("Check Your Schedule")
-                        }
-
-                        else -> {
-                            Text("Schedule")
-                        }
-                    }
+                    Text("Add Your Schedule")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -105,28 +96,12 @@ fun ProviderScheduleScreen(
             )
         },
         floatingActionButton = {
-            when (val uiState = uiState) {
-                is ProviderUIState.Scheduling -> {
-                    FloatingActionButton(
-                        onClick = { viewModel.submitSchedule() },
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = "Add Schedule")
-                    }
-                }
-
-                is ProviderUIState.Scheduled -> {
-                    FloatingActionButton(
-                        onClick = { viewModel.deleteSchedule() },
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete Schedule")
-                    }
-                }
-
-                else -> {}
+            FloatingActionButton(
+                onClick = { viewModel.submitSchedule() },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Check, contentDescription = "Add Schedule")
             }
-
         }
     ) { paddingValues ->
         Box(
@@ -136,24 +111,14 @@ fun ProviderScheduleScreen(
                 .fillMaxSize()
         ) {
             when (val currentUIState = uiState) {
-                is ProviderUIState.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-
-                is ProviderUIState.Error -> {
+                is ProviderSchedulingUIState.Error -> {
                     Text(
                         modifier = Modifier.align(Alignment.Center),
                         text = "Error: ${currentUIState.message}"
                     )
                 }
 
-                is ProviderUIState.Scheduled -> {
-                    ScheduledScreen(currentUIState, viewModel)
-                }
-
-                is ProviderUIState.Scheduling -> {
+                is ProviderSchedulingUIState.Scheduling -> {
                     SchedulingScreen(currentUIState, viewModel)
                 }
             }
@@ -161,20 +126,11 @@ fun ProviderScheduleScreen(
     }
 }
 
-@Composable
-fun ScheduledScreen(
-    uiState: ProviderUIState.Scheduled,
-    viewModel: ProviderScheduleViewModel,
-    modifier: Modifier = Modifier,
-) {
-    ScheduleList(uiState.schedules)
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulingScreen(
-    uiState: ProviderUIState.Scheduling,
-    viewModel: ProviderScheduleViewModel,
+    uiState: ProviderSchedulingUIState.Scheduling,
+    viewModel: ProviderSchedulingViewModel,
     modifier: Modifier = Modifier,
 ) {
     var showStartDatePicker by remember { mutableStateOf(false) }
@@ -255,7 +211,7 @@ fun SchedulingScreen(
                             val date = Instant.ofEpochMilli(utcTimeMillis)
                                 .atZone(ZoneOffset.UTC)
                                 .toLocalDate()
-                            return date.isEqual(today)|| date.isAfter(today)
+                            return date.isEqual(today) || date.isAfter(today)
                         }
                     }
                 ),
@@ -282,7 +238,7 @@ fun SchedulingScreen(
                         override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                             val date = Instant.ofEpochMilli(utcTimeMillis)
                                 .atZone(ZoneOffset.UTC)
-                            return date.isEqual(today)|| date.isAfter(today)
+                            return date.isEqual(today) || date.isAfter(today)
                         }
                     }
                 ),
@@ -325,7 +281,7 @@ fun SchedulingScreen(
                 },
                 onConfirm = { selectedTime ->
                     selectedTime?.let {
-                        viewModel.onTimeSlotSelected(startTime, it)
+                        viewModel.onTimeSlotAdd(startTime, it)
                         showTimePickerStopDialog = false
                         startTime = null
                     }
@@ -417,7 +373,9 @@ fun TimeSlotItem(timeSlot: TimeSlotUIItem, onRemove: (TimeSlotUIItem) -> Unit) {
     ) {
         Text(
             text = "${timeSlot.startTime} ~ ${timeSlot.endTime}",
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
         )
         IconButton(onClick = { onRemove(timeSlot) }) {
             Icon(Icons.Default.Delete, contentDescription = "Remove Time Slot")

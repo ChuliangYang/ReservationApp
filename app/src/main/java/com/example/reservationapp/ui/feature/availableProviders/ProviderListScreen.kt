@@ -17,14 +17,17 @@ import com.example.reservationapp.data.model.Provider
 
 @Composable
 fun ProviderListScreen(
-    onProviderSelected: (Int) -> Unit,
+    clientId: Int,
+    onNavigateToReservation: (clientId: Int, providerId: Int) -> Unit,
     viewModel: ProviderListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     ProviderListScreenContent(
         uiState = uiState,
-        onProviderSelected = onProviderSelected
+        onProviderSelected = { providerId ->
+            onNavigateToReservation(clientId, providerId)
+        }
     )
 }
 
@@ -32,7 +35,7 @@ fun ProviderListScreen(
 @Composable
 fun ProviderListScreenContent(
     uiState: ProviderListUiState,
-    onProviderSelected: (Int) -> Unit
+    onProviderSelected: (providerId: Int) -> Unit
 ) {
     Scaffold(
         topBar = {

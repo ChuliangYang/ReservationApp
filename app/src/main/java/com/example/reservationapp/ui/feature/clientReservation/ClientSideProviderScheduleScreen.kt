@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -22,7 +21,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -53,19 +51,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.reservationapp.core.ui.ScheduleList
+import com.example.reservationapp.data.model.ReserveBlockLength
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClientReservationScreen(
+fun ClientSideProviderScheduleScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToScheduleDetail: (Int) -> Unit,
-    viewModel: ClientReservationViewModel = hiltViewModel()
+    onNavigateToAvailableTimeSlots: (
+        providerId: Int,
+        date: LocalDate,
+        length: ReserveBlockLength,
+    ) -> Unit,
+    viewModel: ClientSideProviderScheduleViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -75,12 +77,12 @@ fun ClientReservationScreen(
         viewModel.events.onEach {
             it?.let { event ->
                 when (event) {
-                    is ClientReservationEventState.Warning -> {
+                    is ClientSideProviderScheduleEvent.Warning -> {
                         Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                     }
 
-                    is ClientReservationEventState.NavigateToProviderSchedule -> {
-                        onNavigateToScheduleDetail(event.providerId)
+                    is ClientSideProviderScheduleEvent.NavigateToAvailableTimeSlot -> {
+                        onNavigateToAvailableTimeSlots(event.providerId, event.date, event.length)
                     }
                 }
                 viewModel.onEventHandled()
@@ -88,13 +90,21 @@ fun ClientReservationScreen(
         }.collect()
     }
 
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showReserveLengthDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedDate by rememberSaveable { mutableStateOf<LocalDate?>(null) }
+
+    fun resetReserveCreationState() {
+        showDatePicker = false
+        showReserveLengthDialog = false
+        selectedDate = null
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    if (uiState !is ClientReservationUIState.Loading) {
-                        Text("Reservation Details")
-                    }
+                    Text("Make Reservation")
                 },
                 navigationIcon = {
                     IconButton(onClick = {
@@ -109,9 +119,18 @@ fun ClientReservationScreen(
                 )
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                resetReserveCreationState()
+                // Set the state to show the reserve length dialog
+                showDatePicker = true
+            }) {
+                Icon(Icons.Default.Add, contentDescription = "Reserve")
+            }
+        }
     ) { paddingValues ->
         when (val uiState = uiState) {
-            is ClientReservationUIState.Loading -> {
+            is ClientSideProviderScheduleUIState.Loading -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -122,7 +141,7 @@ fun ClientReservationScreen(
                 }
             }
 
-            is ClientReservationUIState.Error -> {
+            is ClientSideProviderScheduleUIState.Error -> {
                 val errorMessage = uiState.message
                 Box(
                     modifier = Modifier
@@ -134,114 +153,111 @@ fun ClientReservationScreen(
                 }
             }
 
-            is ClientReservationUIState.Reserved -> {
-                val reservation = uiState.reservation
-                var showDeleteDialog by remember { mutableStateOf(false) }
-                var showConfirmDialog by remember { mutableStateOf(false) }
-
+            is ClientSideProviderScheduleUIState.ShowProviderSchedule -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.Top,
-                    horizontalAlignment = Alignment.Start
                 ) {
-                    // Display reservation details
-                    ReservationDetails(reservation)
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Confirm Reservation Button
-                    if (!reservation.isConfirmed) {
-                        Button(
-                            onClick = { showConfirmDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(text = "Confirm Reservation")
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
-                    // Delete Reservation Button
-                    OutlinedButton(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text(text = "Delete Reservation")
-                    }
-                }
-
-                if (showConfirmDialog) {
-                    ConfirmDialog(
-                        title = "Confirm Reservation",
-                        message = "Are you sure you want to confirm this reservation?",
-                        onConfirm = {
-                            showConfirmDialog = false
-                            viewModel.onReservationConfirm(reservation.id)
-                        },
-                        onDismiss = { showConfirmDialog = false }
+                    Text(
+                        text = "Provider Schedule Detail",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(16.dp)
                     )
-                }
-
-                // Confirmation Dialog for Deleting Reservation
-                if (showDeleteDialog) {
-                    ConfirmDialog(
-                        title = "Delete Reservation",
-                        message = "Are you sure you want to delete this reservation?",
-                        onConfirm = {
-                            showDeleteDialog = false
-                            viewModel.onReservationDelete(reservation.id)
-                        },
-                        onDismiss = { showDeleteDialog = false }
-                    )
+                    ScheduleList(scheduleList = uiState.schedule)
                 }
             }
         }
     }
-}
 
-@Composable
-fun ReservationDetails(reservation: ReservationUI) {
-    Column {
-        Text(
-            text = "Date: ${reservation.date}",
-            style = MaterialTheme.typography.bodyLarge
+    if (showDatePicker) {
+        val today = Instant.now().atZone(ZoneOffset.UTC)
+        DatePickerDialog(
+            datePickerState = rememberDatePickerState(
+                selectableDates = object : SelectableDates {
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                        val date = Instant.ofEpochMilli(utcTimeMillis)
+                            .atZone(ZoneOffset.UTC)
+                        return date.isAfter(today)
+                    }
+                }
+            ),
+            onDismiss = {
+                resetReserveCreationState()
+            },
+            onConfirm = {
+                it?.let {
+                    val date = Instant.ofEpochMilli(it)
+                        .atZone(ZoneOffset.UTC)
+                        .toLocalDate()
+                    selectedDate = date
+                    showDatePicker = false
+                    showReserveLengthDialog = true
+                }
+            }
         )
-        Text(
-            text = "Time: ${reservation.timeSlot.startTime} - ${reservation.timeSlot.endTime}",
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Text(
-            text = "Confirmed: ${if (reservation.isConfirmed) "Yes" else "No"}",
-            style = MaterialTheme.typography.bodyLarge
+    }
+
+    // Reserve Length Dialog
+    if (showReserveLengthDialog) {
+        val reservingState = uiState as? ClientSideProviderScheduleUIState.ShowProviderSchedule
+        AlertDialog(
+            onDismissRequest = { resetReserveCreationState() },
+            title = { Text("Reservation Length") },
+            text = {
+                Column {
+                    reservingState?.reserveBlockLength?.forEach { length ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.onRequestAvailableTimeSlots(selectedDate, length)
+                                    resetReserveCreationState()
+                                }
+                                .padding(8.dp)
+                        ) {
+                            Text(text = "${length.lengthInMinute} minutes")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { resetReserveCreationState() }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConfirmDialog(
-    title: String,
-    message: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+fun DatePickerDialog(
+    datePickerState: DatePickerState = rememberDatePickerState(),
+    onDismiss: () -> Unit,
+    onConfirm: (selectedTimeStamp: Long?) -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(message) },
+    androidx.compose.material3.DatePickerDialog(
+        onDismissRequest = { onDismiss() },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Yes")
+            TextButton(
+                onClick = {
+                    onConfirm(datePickerState.selectedDateMillis)
+                }
+            ) {
+                Text("OK")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("No")
+            TextButton(onClick = { onDismiss() }) {
+                Text("Cancel")
             }
         }
-    )
+    ) {
+        DatePicker(state = datePickerState)
+    }
 }

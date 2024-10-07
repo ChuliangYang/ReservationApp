@@ -1,4 +1,4 @@
-package com.example.reservationapp.core
+package com.example.reservationapp.core.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.reservationapp.ui.feature.providerSchedule.ScheduleUIItem
-import com.example.reservationapp.ui.feature.providerSchedule.TimeSlotUIItem
+import com.example.reservationapp.data.model.Schedule
+import com.example.reservationapp.data.model.TimeSlot
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -60,3 +62,30 @@ fun SectionItem(item: TimeSlotUIItem) {
         },
     )
 }
+
+data class ScheduleUIItem(
+    val scheduleId: String,
+    val date: String,
+    val timeSlots: List<TimeSlotUIItem>
+)
+
+data class TimeSlotUIItem(
+    val startTime: String,
+    val endTime: String,
+)
+
+fun TimeSlot.toUIModel() = TimeSlotUIItem(
+    startTime = startTime.format(DateTimeFormatter.ISO_LOCAL_TIME),
+    endTime = endTime.format(DateTimeFormatter.ISO_LOCAL_TIME),
+)
+
+fun TimeSlotUIItem.toDataModel() = TimeSlot(
+    startTime = LocalTime.parse(startTime, DateTimeFormatter.ISO_LOCAL_TIME),
+    endTime = LocalTime.parse(endTime, DateTimeFormatter.ISO_LOCAL_TIME),
+)
+
+fun Schedule.toUIModel() = ScheduleUIItem(
+    scheduleId = id.toString(),
+    date = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+    timeSlots = timeSlots.map { it.toUIModel() }
+)
