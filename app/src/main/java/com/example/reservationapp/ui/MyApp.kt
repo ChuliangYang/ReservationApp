@@ -113,7 +113,7 @@ fun MyApp() {
                     navController.navigate(
                         ProviderAvailableTimeSlots(
                             providerId = providerId,
-                            date = date.toDateRouteArgument(),
+                            date = date.toRouteArgument(),
                             length = length.toRouteArgument()
                         )
                     )
@@ -132,7 +132,7 @@ fun MyApp() {
                             providerId = reservation.providerId,
                             clientId = reservation.userId,
                             reservationId = reservationId,
-                            createAt = reservation.createdAt.convertTimeRouteArgument()
+                            createAt = reservation.createdAt.toRouteArgument()
                         )
                     )
                 }
@@ -145,15 +145,15 @@ fun String.fromDateRouteArgument(): LocalDate {
     return LocalDate.parse(this, DateTimeFormatter.ISO_LOCAL_DATE)
 }
 
-fun LocalDate.toDateRouteArgument(): String {
+fun LocalDate.toRouteArgument(): String {
     return this.format(DateTimeFormatter.ISO_LOCAL_DATE)
 }
 
-fun String.fromTimeRouteArgument(): Instant {
+fun String.fromInstantRouteArgument(): Instant {
     return Instant.parse(this)
 }
 
-fun Instant.convertTimeRouteArgument(): String {
+fun Instant.toRouteArgument(): String {
     return this.toString()
 }
 

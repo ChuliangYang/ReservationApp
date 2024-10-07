@@ -11,7 +11,7 @@ import com.example.reservationapp.domain.ReservationConfirmUseCase
 import com.example.reservationapp.domain.ReservationDeleteUseCase
 import com.example.reservationapp.domain.StartMonitoringReservationUseCase
 import com.example.reservationapp.ui.ClientReservation
-import com.example.reservationapp.ui.fromTimeRouteArgument
+import com.example.reservationapp.ui.fromInstantRouteArgument
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +33,7 @@ class ClientReservationViewModel @Inject constructor(
     private val providerId: Int = savedStateHandle.toRoute<ClientReservation>().providerId
     private val reservationId: Int? = savedStateHandle.toRoute<ClientReservation>().reservationId
     private val reservationCreationTime: Instant? =
-        savedStateHandle.toRoute<ClientReservation>().createAt?.fromTimeRouteArgument()
+        savedStateHandle.toRoute<ClientReservation>().createAt?.fromInstantRouteArgument()
     private val _uiState =
         MutableStateFlow<ClientReservationUIState>(ClientReservationUIState.Loading)
     val uiState: StateFlow<ClientReservationUIState> = _uiState.asStateFlow()
