@@ -100,18 +100,18 @@ class ProviderSchedulingViewModel @Inject constructor(
     }
 
     fun submitSchedule() {
-        viewModelScope.launch {
-            val currentState = _uiState.value
-            if (currentState is ProviderSchedulingUIState.Scheduling) {
-                val startDate = startDateFlow.value
-                val endDate = endDateFlow.value
-                val timeSlots = timeSlotsFlow.value
-                if (startDate == null) {
-                    _events.value =
-                        ProviderSchedulingEvent.Warning("Please input valid start date!")
-                    return@launch
-                }
+        val currentState = _uiState.value
+        if (currentState is ProviderSchedulingUIState.Scheduling) {
+            val startDate = startDateFlow.value
+            val endDate = endDateFlow.value
+            val timeSlots = timeSlotsFlow.value
+            if (startDate == null) {
+                _events.value =
+                    ProviderSchedulingEvent.Warning("Please input valid start date!")
+                return
+            }
 
+            viewModelScope.launch {
                 submitProviderScheduleUseCase.execute(
                     providerId,
                     startDate,
